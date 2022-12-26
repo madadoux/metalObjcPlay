@@ -36,6 +36,8 @@ struct RasterizerData
     // and pass that interpolated value to the fragment shader for each fragment in
     // that triangle.
     float2 textureCoordinate;
+    
+    float2 viewportSize;
 
 };
 
@@ -64,15 +66,14 @@ vertexShader(uint vertexID [[ vertex_id ]],
     //  divide the pixel coordinates by half the size of the viewport.
     // Z is set to 0.0 and w to 1.0 because this is 2D sample.
     out.position = vector_float4(pixelSpacePosition, 0.0, 1.0);
-    out.position =  (*mvp *  out.position);
-    pixelSpacePosition =   out.position.xy;
+   // out.position =  (*mvp *  out.position);
+    //pixelSpacePosition =   out.position.xy;
     out.position.xy = pixelSpacePosition / (viewportSize / 2.0);
-    
     // Pass the input textureCoordinate straight to the output RasterizerData. This value will be
     //   interpolated with the other textureCoordinate values in the vertices that make up the
     //   triangle.
     out.textureCoordinate = vertexArray[vertexID].textureCoordinate;
-    
+    out.viewportSize = viewportSize;
     return  out;
 }
 
@@ -83,16 +84,25 @@ samplingShader(RasterizerData in [[stage_in]],
 {
     constexpr sampler textureSampler (mag_filter::linear,
                                       min_filter::linear);
-
+    
+    
     // Sample the texture to obtain a color
     const half4 colorSample = colorTexture.sample(textureSampler, in.textureCoordinate);
-
-    // return the color of the texture
-    if ( int(in.position.x) %2 == 0  &&int(in.position.y) %2 == 0  ){
-        return float4( 0.0 , 0.0 ,0.0 , 1.0);
+    
+    
+    float2  uv = in.position.xy / in.viewportSize;
+    uv -= .5;
+    uv.x *= in.viewportSize.x / in.viewportSize.y;
+    
+    float4 center = float4(0,0,0,1);
+    //return float4(distance,0,0,1.0);
+    
+    float r = .1;
+    if ( distance(uv,center.xy) < r) {
+        return float4(colorSample);
     }
     else {
-        return float4(colorSample);
+        return  float4(0);
     }
 }
 
