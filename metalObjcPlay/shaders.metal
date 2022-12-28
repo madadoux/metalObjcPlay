@@ -10,11 +10,11 @@ using namespace metal;
 
 
 /*
-See LICENSE folder for this sample’s licensing information.
-
-Abstract:
-Metal shaders used for this sample
-*/
+ See LICENSE folder for this sample’s licensing information.
+ 
+ Abstract:
+ Metal shaders used for this sample
+ */
 
 #include <metal_stdlib>
 #include <simd/simd.h>
@@ -30,7 +30,7 @@ struct RasterizerData
     // the clip space position of the vertex when this structure is returned from
     // the vertex shader
     float4 position [[position]];
-
+    
     // Since this member does not have a special attribute qualifier, the rasterizer
     // will interpolate its value with values of other vertices making up the triangle
     // and pass that interpolated value to the fragment shader for each fragment in
@@ -38,7 +38,7 @@ struct RasterizerData
     float2 textureCoordinate;
     
     float2 viewportSize;
-
+    
 };
 
 // Vertex Function
@@ -51,22 +51,22 @@ vertexShader(uint vertexID [[ vertex_id ]],
              )
 
 {
-
+    
     RasterizerData out;
-
+    
     // Index into the array of positions to get the current vertex.
     //   Positions are specified in pixel dimensions (i.e. a value of 100 is 100 pixels from
     //   the origin)
     float2 pixelSpacePosition = vertexArray[vertexID].position.xy;
-
+    
     // Get the viewport size and cast to float.
     float2 viewportSize = float2(*viewportSizePointer);
-
+    
     // To convert from positions in pixel space to positions in clip-space,
     //  divide the pixel coordinates by half the size of the viewport.
     // Z is set to 0.0 and w to 1.0 because this is 2D sample.
     out.position = vector_float4(pixelSpacePosition, 0.0, 1.0);
-   // out.position =  (*mvp *  out.position);
+    // out.position =  (*mvp *  out.position);
     //pixelSpacePosition =   out.position.xy;
     out.position.xy = pixelSpacePosition / (viewportSize / 2.0);
     // Pass the input textureCoordinate straight to the output RasterizerData. This value will be
@@ -98,8 +98,11 @@ samplingShader(RasterizerData in [[stage_in]],
     //return float4(distance,0,0,1.0);
     
     float r = .1;
-    if ( distance(uv,center.xy) < r) {
-        return float4(colorSample);
+    float d = distance(uv,center.xy);
+    // give me a value from r/2 to r  calculated from d the linearly interpolated between this 2 values
+    float c = smoothstep(r, r/2.0, d);
+    if ( d < r) {
+        return float4( mix(float3(0) , float3(colorSample.x,colorSample.y,colorSample.z),c),1.0);
     }
     else {
         return  float4(0);
