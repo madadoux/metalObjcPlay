@@ -4,144 +4,195 @@
 //
 //  Created by ME-MAC on 25/12/2022.
 //
-#import <string>
 #import "Renderer.h"
 #import "AAPLShaderTypes.h"
 #import "AAPLTransforms.h"
 #import <simd/simd.h>
+#import <string>
 
 @implementation Renderer
 
 {
-    // The device (aka GPU) used to render
-    id<MTLDevice> _device;
+  // The device (aka GPU) used to render
+  id<MTLDevice> _device;
 
-    id<MTLRenderPipelineState> _pipelineState;
+  id<MTLRenderPipelineState> _pipelineState;
 
-    // The command Queue used to submit commands.
-    id<MTLCommandQueue> _commandQueue;
+  id<MTLDepthStencilState> _depthState;
 
-    // The Metal texture object
-    id<MTLTexture> _texture;
+  // The command Queue used to submit commands.
+  id<MTLCommandQueue> _commandQueue;
 
-    // The Metal buffer that holds the vertex data.
-    id<MTLBuffer> _vertices;
+  // The Metal texture object
+  id<MTLTexture> _texture;
 
-    // The number of vertices in the vertex buffer.
-    NSUInteger _numVertices;
+  // The Metal buffer that holds the vertex data.
+  id<MTLBuffer> _vertices;
 
-    // The current size of the view.
-    vector_uint2 _viewportSize;
-    
-    double time;
+  // The number of vertices in the vertex buffer.
+  NSUInteger _numVertices;
+
+  // The current size of the view.
+  vector_uint2 _viewportSize;
+
+  double time;
 }
-
-
 
 - (instancetype)initWithMTKView:(MTKView *)view {
-    self = [super init];
-    if (self) {
-        _device = view.device;
-        MTKTextureLoader *loader  = [[MTKTextureLoader alloc] initWithDevice:_device];
-        
-        NSURL *imageUrl = [[NSBundle mainBundle] URLForResource:@"textureExample" withExtension:@"png"];
-        _texture = [loader newTextureWithContentsOfURL:imageUrl options:nil error:nil];
-        
-        
-        AAPLVertex quadVertices[] = {
-            // first triangle
-            { {  250,  -250 },  { 1.f, 1.f } },
-            { { -250,  -250 },  { 0.f, 1.f } },
-            { { -250,   250 },  { 0.f, 0.f } },
-            // second triangle
-            { {  250,  -250 },  { 1.f, 1.f } },
-            { { -250,   250 },  { 0.f, 0.f } },
-            { {  250,   250 },  { 1.f, 0.f } },
-            
-        };
-        
-        
-        _vertices = [_device newBufferWithBytes:quadVertices
-                                         length:sizeof(quadVertices)
-                                        options:MTLResourceStorageModeShared];
-        
-        _numVertices = sizeof(quadVertices) / sizeof(AAPLVertex);
-        
-        
-        _commandQueue = [_device newCommandQueue];
-        
-        id<MTLLibrary> shaderLib = [_device newDefaultLibrary];
-        
-        MTLRenderPipelineDescriptor *renderDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-        
-        
-        renderDescriptor.label = @"Texturing Pipeline";
-        renderDescriptor.vertexFunction = [shaderLib newFunctionWithName:@"vertexShader"];
-        renderDescriptor.fragmentFunction = [shaderLib newFunctionWithName:@"samplingShader"];
-        renderDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat;
-        
-        NSError *error;
-        _pipelineState = [_device newRenderPipelineStateWithDescriptor:renderDescriptor error:&error];
-        
-        
-        if (error != nil ){
-            NSLog(@"failed to creader the render state %@ " , error.description);
-        }
-        
-        
+  self = [super init];
+  if (self) {
+    _device = view.device;
+
+    // Indicate that each pixel in the depth buffer is a 32-bit floating point
+    // value.
+    view.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
+    // init all with ones
+    view.clearDepth = 1.0;
+
+    MTKTextureLoader *loader =
+        [[MTKTextureLoader alloc] initWithDevice:_device];
+
+    NSURL *imageUrl = [[NSBundle mainBundle] URLForResource:@"textureExample"
+                                              withExtension:@"png"];
+    _texture = [loader newTextureWithContentsOfURL:imageUrl
+                                           options:nil
+                                             error:nil];
+
+    _commandQueue = [_device newCommandQueue];
+
+    id<MTLLibrary> shaderLib = [_device newDefaultLibrary];
+
+    MTLRenderPipelineDescriptor *renderDescriptor =
+        [[MTLRenderPipelineDescriptor alloc] init];
+
+    renderDescriptor.label = @"Texturing Pipeline";
+    renderDescriptor.vertexFunction =
+        [shaderLib newFunctionWithName:@"vertexShader"];
+    renderDescriptor.fragmentFunction =
+        [shaderLib newFunctionWithName:@"samplingShader"];
+    renderDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat;
+    renderDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat;
+
+    NSError *error;
+    _pipelineState =
+        [_device newRenderPipelineStateWithDescriptor:renderDescriptor
+                                                error:&error];
+
+    MTLDepthStencilDescriptor *depthDesc =
+        [[MTLDepthStencilDescriptor alloc] init];
+    depthDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
+    depthDesc.depthWriteEnabled = true;
+    _depthState = [_device newDepthStencilStateWithDescriptor:depthDesc];
+
+    if (error != nil) {
+      NSLog(@"failed to creader the render state %@ ", error.description);
     }
-    
-    return self;
+  }
+
+  return self;
 }
 - (void)drawInMTKView:(nonnull MTKView *)view {
-    
-    id<MTLCommandBuffer> commandBuffer = [_commandQueue commandBuffer];
-    commandBuffer.label = @"my command buffer";
-    
-    MTLRenderPassDescriptor *renderPassDescriptor = view.currentRenderPassDescriptor;
-    
-    id<MTLRenderCommandEncoder> commandEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-   
-    [commandEncoder setViewport:(MTLViewport){0.0, 0.0, static_cast<double>(_viewportSize.x), static_cast<double>(_viewportSize.y), -1.0, 1.0 }];
 
-    [commandEncoder setRenderPipelineState:_pipelineState];
-    
-    [commandEncoder setVertexBuffer:_vertices offset:0 atIndex:AAPLVertexInputIndexVertices];
-    
-    [commandEncoder setVertexBytes:&_viewportSize length:sizeof(_viewportSize) atIndex:AAPLVertexInputIndexViewportSize];
-    /*   let modelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: angle) *  float4x4(scaleBy: 2)
-     
-     let viewMatrix = float4x4(translationBy: float3(0, 0, -2))
-     let modelViewMatrix = viewMatrix * modelMatrix
-     let aspectRatio = Float(view.drawableSize.width / view.drawableSize.height)
-     let projectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 3, aspectRatio: aspectRatio, nearZ: 0.1, farZ: 100)
-     
-     var uniforms = Uniforms(modelViewMatrix: modelViewMatrix, projectionMatrix: projectionMatrix)
-     */
-    using namespace AAPL;
-    time += view.preferredFramesPerSecond;
-    
-    // TRS matrix
-    simd::float4x4 transformationMatrix = Math::scale(1.5, 1.5, 1) * Math::rotate(time/60, 0, 0, 1) * AAPL::Math::translate(-0.0, 0.3, .0)  ;
-    
-    [commandEncoder setVertexBytes:&transformationMatrix length:sizeof(transformationMatrix) atIndex:AAPLVertexMVPMatrix];
-    
-    [commandEncoder setFragmentTexture:_texture atIndex:AAPLTextureIndexBaseColor];
-    
-    
-    [commandEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:_numVertices];
-    
-    [commandEncoder endEncoding];
-    
-    
-    [commandBuffer presentDrawable: view.currentDrawable];
-    
-    [commandBuffer commit];
+  id<MTLCommandBuffer> commandBuffer = [_commandQueue commandBuffer];
+  commandBuffer.label = @"my command buffer";
+
+  MTLRenderPassDescriptor *renderPassDescriptor =
+      view.currentRenderPassDescriptor;
+
+  id<MTLRenderCommandEncoder> commandEncoder =
+      [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+
+  [commandEncoder
+      setViewport:(MTLViewport){0.0, 0.0, static_cast<double>(_viewportSize.x),
+                                static_cast<double>(_viewportSize.y), -1.0,
+                                1.0}];
+
+  [commandEncoder setRenderPipelineState:_pipelineState];
+  [commandEncoder setDepthStencilState:_depthState];
+
+  AAPLVertex quadVertices[] = {
+      // first triangle
+      {{250, -250, .5f, 1}, {1.f, 1.f}, {.5f, 0.5f, .5f}},
+      {{-250, -250, .5f, 1}, {0.f, 1.f}, {.5f, 0.5f, .5f}},
+      {{-250, 250, .5f, 1}, {0.f, 0.f}, {.5f, 0.5f, .5f}},
+      // second triangle
+      {{250, -250, .5f, 1}, {1.f, 1.f}, {.5f, 0.5f, .5f}},
+      {{-250, 250, .5f, 1}, {0.f, 0.f}, {.5f, 0.5f, .5f}},
+      {{250, 250, .5f, 1}, {1.f, 0.f}, {.5f, 0.5f, .5f}},
+  };
+
+  _vertices = [_device newBufferWithBytes:quadVertices
+                                   length:sizeof(quadVertices)
+                                  options:MTLResourceStorageModeShared];
+
+  [commandEncoder setVertexBuffer:_vertices
+                           offset:0
+                          atIndex:AAPLVertexInputIndexVertices];
+
+  [commandEncoder setVertexBytes:&_viewportSize
+                          length:sizeof(_viewportSize)
+                         atIndex:AAPLVertexInputIndexViewportSize];
+
+  using namespace AAPL;
+  time += view.preferredFramesPerSecond;
+
+  // TRS matrix
+  simd::float4x4 transformationMatrix = Math::scale(1.5, 1.5, 1) *
+                                        Math::rotate(time / 60, 0, 0, 1) *
+                                        AAPL::Math::translate(-0.0, 0.3, .0);
+
+  [commandEncoder setVertexBytes:&transformationMatrix
+                          length:sizeof(transformationMatrix)
+                         atIndex:AAPLVertexMVPMatrix];
+
+  [commandEncoder setFragmentTexture:_texture
+                             atIndex:AAPLTextureIndexBaseColor];
+
+  bool hasNoTexture = false;
+  [commandEncoder setFragmentBytes:&hasNoTexture
+                            length:sizeof(hasNoTexture)
+                           atIndex:AAPLFragmentHasNoTexture];
+
+  [commandEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+                     vertexStart:0
+                     vertexCount:6];
+
+  AAPLVertex triangleVertices[] = {
+      // first triangle
+      {{100, -550, 0.f, 1}, {1.f, 1.f}, {1.f, 0.f, 1.f}},
+      {{-100, -450, 0, 1}, {0.f, 1.f}, {1.f, 1.f, 0.f}},
+      {{-100, 250, 1.0, 1}, {0.f, 0.f}, {0.f, 1.f, 1.f}},
+
+  };
+
+  id<MTLBuffer> triVertices =
+      [_device newBufferWithBytes:triangleVertices
+                           length:sizeof(triangleVertices)
+                          options:MTLResourceStorageModeShared];
+
+  [commandEncoder setVertexBuffer:triVertices
+                           offset:0
+                          atIndex:AAPLVertexInputIndexVertices];
+
+  hasNoTexture = true;
+  [commandEncoder setFragmentBytes:&hasNoTexture
+                            length:sizeof(hasNoTexture)
+                           atIndex:AAPLFragmentHasNoTexture];
+
+  [commandEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+                     vertexStart:0
+                     vertexCount:3];
+
+  [commandEncoder endEncoding];
+
+  [commandBuffer presentDrawable:view.currentDrawable];
+
+  [commandBuffer commit];
 }
 
 - (void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
-    _viewportSize.x = size.width;
-    _viewportSize.y = size.height;
+  _viewportSize.x = size.width;
+  _viewportSize.y = size.height;
 }
 
 @end

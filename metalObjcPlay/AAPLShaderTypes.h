@@ -17,8 +17,17 @@ typedef enum AAPLVertexInputIndex
     AAPLVertexInputIndexVertices     = 0,
     AAPLVertexInputIndexViewportSize = 1,
     AAPLVertexMVPMatrix              = 2,
+   
+
 } AAPLVertexInputIndex;
 
+
+typedef enum AAPLFragmentInputIndex
+{
+    AAPLFragmentHasNoTexture   = 0,
+    
+   
+} AAPLFragmentInputIndex;
 // Texture index values shared between shader and C code to ensure Metal shader buffer inputs match
 //   Metal API texture set calls
 typedef enum AAPLTextureIndex
@@ -34,10 +43,13 @@ typedef enum AAPLTextureIndex
 typedef struct
 {
     // Positions in pixel space. A value of 100 indicates 100 pixels from the origin/center.
-    vector_float2 position;
+    vector_float4 position;
 
     // 2D texture coordinate
     vector_float2 textureCoordinate;
+    
+    // vec3 color
+    vector_float3 color;
 } AAPLVertex;
 
 #endif /* AAPLShaderTypes_h */
