@@ -58,7 +58,7 @@ vertexShader(uint vertexID [[ vertex_id ]],
     // Index into the array of positions to get the current vertex.
     //   Positions are specified in pixel dimensions (i.e. a value of 100 is 100 pixels from
     //   the origin)
-    float2 pixelSpacePosition = vertexArray[vertexID].position.xy;
+    float4 pixelSpacePosition = vertexArray[vertexID].position;
 
     // Get the viewport size and cast to float.
     float2 viewportSize = float2(*viewportSizePointer);
@@ -66,11 +66,13 @@ vertexShader(uint vertexID [[ vertex_id ]],
     // To convert from positions in pixel space to positions in clip-space,
     //  divide the pixel coordinates by half the size of the viewport.
     // Z is set to 0.0 and w to 1.0 because this is 2D sample.
-    out.position = vector_float4(pixelSpacePosition, 0.0, 1.0);
-   // out.position =  (*mvp *  out.position);
+    out.position = pixelSpacePosition;
+    
+    out.position.xy = out.position.xy / (viewportSize / 2.0);
+
+    out.position =  (*mvp *  out.position);
     //pixelSpacePosition =   out.position.xy;
-    out.position.xy = pixelSpacePosition / (viewportSize / 2.0);
-    out.position.z = vertexArray[vertexID].position.z;
+    //out.position.z = vertexArray[vertexID].position.z;
     // Pass the input textureCoordinate straight to the output RasterizerData. This value will be
     //   interpolated with the other textureCoordinate values in the vertices that make up the
     //   triangle.

@@ -106,7 +106,7 @@
       setViewport:(MTLViewport){0.0, 0.0, static_cast<double>(_viewportSize.x),
                                 static_cast<double>(_viewportSize.y), -1.0,
                                 1.0}];
-
+  [commandEncoder setCullMode: MTLCullModeBack];
   [commandEncoder setRenderPipelineState:_pipelineState];
   [commandEncoder setDepthStencilState:_depthState];
 
@@ -138,7 +138,7 @@
 
   // TRS matrix
   simd::float4x4 transformationMatrix = Math::scale(1.5, 1.5, 1) *
-                                        Math::rotate(time / 60, 0, 0, 1) *
+                                        Math::rotate(time / 60, 0, 1, 0) *
                                         AAPL::Math::translate(-0.0, 0.3, .0);
 
   [commandEncoder setVertexBytes:&transformationMatrix
@@ -162,7 +162,6 @@
       {{100, -550, 0.f, 1}, {1.f, 1.f}, {1.f, 0.f, 1.f}},
       {{-100, -450, 0, 1}, {0.f, 1.f}, {1.f, 1.f, 0.f}},
       {{-100, 250, 1.0, 1}, {0.f, 0.f}, {0.f, 1.f, 1.f}},
-
   };
 
   id<MTLBuffer> triVertices =
@@ -173,7 +172,12 @@
   [commandEncoder setVertexBuffer:triVertices
                            offset:0
                           atIndex:AAPLVertexInputIndexVertices];
-
+    
+  simd::float4x4 transformationMatrix1 = matrix_identity_float4x4;
+   
+  [commandEncoder setVertexBytes:&transformationMatrix1
+                            length:sizeof(transformationMatrix1)
+                           atIndex:AAPLVertexMVPMatrix];
   hasNoTexture = true;
   [commandEncoder setFragmentBytes:&hasNoTexture
                             length:sizeof(hasNoTexture)
